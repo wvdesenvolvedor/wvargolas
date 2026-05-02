@@ -168,6 +168,8 @@ let progressoMax = 0;
 let moedasObj = [];
 let obstaculos = [];
 let particulas = [];
+let climaParticulas = [];
+let temaAtual = 'espaco';
 let estrelas = [];
 let countdown = 0;
 let ultimo = 0;
@@ -205,14 +207,6 @@ function criarFase(n){
   const d = Math.min(1, n / 1000);
   const multTamanho = dificuldade === 1 ? 0.75 : dificuldade === 3 ? 1.6 : dificuldade === 4 ? 2.3 : 1.0;
   const multVel = dificuldade === 1 ? 1.1 : dificuldade === 3 ? 0.9 : dificuldade === 4 ? 0.8 : 1.0;
-  // Formas que aumentam levemente desde o nível 1
-  const formas = ['onda','v','montanha','circulo','coracao','geometrico','ondulado'];
-  let forma;
-  if(n === 1) forma = 'onda';
-  else if(n === 2) forma = Math.random() < 0.7 ? 'onda' : 'v';
-  else if(n === 3) forma = formas[Math.floor(Math.random()*3)]; // onda, v, montanha
-  else if(n < 6) forma = formas[Math.floor(Math.random()*5)]; // até coração
-  else forma = formas[Math.floor(Math.random()*formas.length)]; // aleatório total
   return {
     n,
     seed: n * 911 + 77,
@@ -226,7 +220,7 @@ function criarFase(n){
     raioFora: 44 - d * 1.5,  // MESMO TAMANHO do modo dentro
     furoFora: 34 - d * 2,   // MESMO TAMANHO do modo dentro
     offset: 43 - d * 5,
-    forma: forma
+    forma: (function(){const formas=['onda','v','montanha','circulo','coracao','geometrico','ondulado']; if(n===1)return'onda'; if(n===2)return Math.random()<0.7?'onda':'v'; if(n<5)return formas[Math.floor(Math.random()*3)]; return formas[Math.floor(Math.random()*formas.length)];})()
   };
 }
 function linhaY(x){
@@ -235,42 +229,47 @@ function linhaY(x){
   const a = fase.amp;
   const forma = fase.forma || 'onda';
   
-  if(forma === 'onda'){
-    return base + Math.sin(x * f + fase.n * .36) * a + Math.sin(x * f * .42 + fase.n) * a * .42;
+  // Base suave sempre
+  let y = base + Math.sin(x * f + fase.n * .36) * a * 0.7 + Math.sin(x * f * .42 + fase.n) * a * 0.3;
+  
+  // Aplica forma apenas em segmentos (não no caminho todo)
+  const segmento = 520; // a cada 520px
+  const duracao = 220;  // forma dura 220px
+  const posNoSegmento = x % segmento;
+  
+  if(posNoSegmento < duracao && fase.n > 1){
+    const t = posNoSegmento / duracao; // 0 a 1
+    const suavizacao = Math.sin(t * Math.PI); // entrada e saída suave
+    
+    let offsetForma = 0;
+    
+    if(forma === 'v'){
+      // V arredondado
+      const v = t < 0.5 ? t*2 : 2-t*2;
+      offsetForma = (v - 0.5) * a * 1.2;
+    } else if(forma === 'montanha'){
+      // Montanha suave
+      const m = Math.sin(t * Math.PI);
+      offsetForma = m * a * 1.0;
+    } else if(forma === 'circulo'){
+      // Círculo suave
+      offsetForma = Math.sin(t * Math.PI * 2) * a * 0.8;
+    } else if(forma === 'coracao'){
+      // Coração arredondado
+      const ht = t * Math.PI * 2;
+      offsetForma = Math.sin(ht) * Math.pow(Math.abs(Math.cos(ht)),0.7) * a * 0.9;
+    } else if(forma === 'geometrico'){
+      // Geométrico mas com cantos arredondados
+      const sq = Math.sin(t * Math.PI * 2);
+      offsetForma = sq * a * 0.7;
+    } else if(forma === 'ondulado'){
+      offsetForma = Math.sin(t * Math.PI * 4) * a * 0.5 + Math.sin(t * Math.PI * 2) * a * 0.3;
+    }
+    
+    y += offsetForma * suavizacao;
   }
-  if(forma === 'v'){
-    const periodo = 220;
-    const t = (x % periodo) / periodo;
-    const v = t < 0.5 ? (t*2) : (2 - t*2);
-    return base + (v - 0.5) * a * 1.6 + Math.sin(x * f * 2) * a * 0.18;
-  }
-  if(forma === 'montanha'){
-    const periodo = 280;
-    const t = (x % periodo) / periodo;
-    let m = t < 0.3 ? t/0.3 : t < 0.6 ? 1 - (t-0.3)/0.3 : 0;
-    return base + (m - 0.3) * a * 1.9 + Math.sin(x * f * 0.5) * a * 0.25;
-  }
-  if(forma === 'circulo'){
-    const periodo = 180;
-    const t = (x % periodo) / periodo * Math.PI * 2;
-    return base + Math.sin(t) * a * 1.1 + Math.cos(t*2) * a * 0.45;
-  }
-  if(forma === 'coracao'){
-    const periodo = 320;
-    const t = (x % periodo) / periodo * Math.PI * 2;
-    const heart = Math.sin(t) * Math.sqrt(Math.abs(Math.cos(t))) * 0.85;
-    return base + heart * a * 1.4 + Math.sin(x * f * 0.7) * a * 0.22;
-  }
-  if(forma === 'geometrico'){
-    const periodo = 200;
-    const t = (x % periodo) / periodo;
-    const sq = t < 0.25 ? 1 : t < 0.5 ? 0 : t < 0.75 ? -1 : 0;
-    return base + sq * a * 0.95 + Math.sin(x * f * 3) * a * 0.13;
-  }
-  if(forma === 'ondulado'){
-    return base + Math.sin(x * f * 1.3) * a * 0.75 + Math.sin(x * f * 2.7 + 1.2) * a * 0.55 + Math.sin(x * f * 0.4) * a * 0.8;
-  }
-  return base + Math.sin(x * f + fase.n * .36) * a;
+  
+  return y;
 }
 function linhaSlope(x){
   const y1 = linhaY(x - 8);
@@ -296,6 +295,63 @@ function resize(){
 }
 window.addEventListener('resize', resize);
 
+
+function atualizarClima(dt){
+  if(!fase || !fase.clima) return;
+  const clima = fase.clima;
+  if(clima === 'chuva' && Math.random() < 0.35){
+    climaParticulas.push({x:Math.random()*W, y:-10, vx:-1.5, vy:11+Math.random()*3, tipo:'chuva'});
+  }
+  if(clima === 'neve' && Math.random() < 0.22){
+    climaParticulas.push({x:Math.random()*W, y:-10, vx:-0.3+Math.random()*0.6, vy:1.2+Math.random(), tipo:'neve', rot:Math.random()*6});
+  }
+  if(clima === 'meteoro' && Math.random() < 0.025){
+    climaParticulas.push({x:Math.random()*W+150, y:-40, vx:-7-Math.random()*3, vy:5+Math.random()*2, tipo:'meteoro'});
+  }
+  if(clima === 'fogo' && Math.random() < 0.28){
+    climaParticulas.push({x:Math.random()*W, y:-10, vx:-0.5+Math.random(), vy:7+Math.random()*2.5, tipo:'fogo'});
+  }
+  if(clima === 'primavera' && Math.random() < 0.14){
+    climaParticulas.push({x:Math.random()*W, y:-10, vx:-0.2+Math.random()*0.4, vy:0.9+Math.random()*0.6, tipo:'flor', rot:Math.random()*6, cor:['#ff69b4','#ffb6c1','#ffc0cb'][0|Math.random()*3]});
+  }
+  if(clima === 'inverno' && Math.random() < 0.18){
+    climaParticulas.push({x:Math.random()*W, y:-10, vx:-0.15+Math.random()*0.3, vy:0.7+Math.random()*0.5, tipo:'gelo'});
+  }
+  climaParticulas = climaParticulas.filter(p => {
+    p.x += p.vx; p.y += p.vy;
+    if(p.rot !== undefined) p.rot += 0.015;
+    return p.y < H+30 && p.x > -30 && p.x < W+30;
+  });
+}
+function desenharClima(){
+  if(!fase || !fase.clima) return;
+  const clima = fase.clima;
+  ctx.save();
+  if(clima === 'nublado'){
+    ctx.globalAlpha = 0.22; ctx.fillStyle = '#777';
+    for(let i=0;i<3;i++){ const x=(i*340 - camera*0.08)% (W+200)-100; ctx.beginPath(); ctx.arc(x,75,55,0,7); ctx.arc(x+45,75,45,0,7); ctx.fill(); }
+  }
+  if(clima === 'ensolarado' || clima === 'verao'){
+    const cx=W*0.86, cy=88; ctx.globalAlpha=0.13; ctx.strokeStyle='#ffeb3b'; ctx.lineWidth=2.5;
+    for(let i=0;i<10;i++){ const a=i*Math.PI/5 + Date.now()*0.00025; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(a)*180, cy+Math.sin(a)*180); ctx.stroke(); }
+  }
+  ctx.globalAlpha = 0.88;
+  climaParticulas.forEach(p=>{
+    if(p.tipo==='chuva'){ ctx.strokeStyle='#6bb6ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x+1.2,p.y+11); ctx.stroke(); }
+    else if(p.tipo==='neve'){ ctx.fillStyle='#fff'; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillRect(-1,-4,2,8); ctx.fillRect(-4,-1,8,2); ctx.restore(); }
+    else if(p.tipo==='meteoro'){ ctx.strokeStyle='#ff7700'; ctx.lineWidth=3; ctx.shadowColor='#ff4400'; ctx.shadowBlur=10; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-p.vx*1.8,p.y-p.vy*1.8); ctx.stroke(); ctx.shadowBlur=0; ctx.fillStyle='#fff6a0'; ctx.beginPath(); ctx.arc(p.x,p.y,2.8,0,7); ctx.fill(); }
+    else if(p.tipo==='fogo'){ const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,5); g.addColorStop(0,'#ff0'); g.addColorStop(0.6,'#f60'); g.addColorStop(1,'rgba(200,0,0,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p.x,p.y,5,0,7); ctx.fill(); }
+    else if(p.tipo==='flor'){ ctx.fillStyle=p.cor; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); for(let i=0;i<5;i++){ ctx.rotate(1.256); ctx.beginPath(); ctx.ellipse(0,-2.5,1.8,3.2,0,0,7); ctx.fill(); } ctx.restore(); }
+    else if(p.tipo==='gelo'){ ctx.strokeStyle='#b3e5fc'; ctx.lineWidth=1.2; ctx.save(); ctx.translate(p.x,p.y); for(let i=0;i<6;i++){ ctx.rotate(1.047); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-4); ctx.stroke(); } ctx.restore(); }
+  });
+  ctx.restore();
+}
+function desenharNomesPlanetas(){
+  if(!temaAtual) return;
+  const nomes = {sol:'SOL',lua:'LUA',terra:'TERRA',marte:'MARTE',saturno:'SATURNO',jupiter:'JÚPITER',venus:'VÊNUS',mercurio:'MERCÚRIO',urano:'URANO',netuno:'NETUNO',espaco:'ESPAÇO'};
+  const nome = nomes[temaAtual];
+  if(nome){ ctx.save(); ctx.globalAlpha=0.8; ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(W/2-70, H-48, 140, 24); ctx.fillStyle='#fff'; ctx.font='bold 13px Arial'; ctx.textAlign='center'; ctx.fillText(nome, W/2, H-31); ctx.restore(); }
+}
 function gerarEstrelas(){
   estrelas = [];
   const r = randSeed(1234);
@@ -303,6 +359,8 @@ function gerarEstrelas(){
 }
 function iniciar(n){
   fase = criarFase(n);
+  const temas=['espaco','sol','lua','terra','marte','saturno','jupiter','venus']; temaAtual = temas[Math.floor(Math.random()*temas.length)];
+  climaParticulas = [];
   camera = 0;
   const baseX = 190;
   const pos = modo === 'fora' ? posNaLinha(baseX, 1) : {x:baseX, y:linhaY(baseX), angle:linhaSlope(baseX)};
@@ -359,14 +417,30 @@ function gerarObjetos(){
       obstaculos.push({linhaX:x,x:x,y:y,abertura:138 - Math.min(28, fase.n*.015),w:28,passou:false,tipo:'portao'});
     }
   }
+  // Fases difíceis: adiciona obstáculo extra no caminho
+  if(fase.n >= 8){
+    const tipos = ['bola','portao','espinho'];
+    for(let i=0;i<Math.min(3, Math.floor(fase.n/5)); i++){
+      const x = 800 + i*600 + r()*200;
+      const tipo = tipos[i % tipos.length];
+      if(modo === 'fora'){
+        const p = posNaLinha(x, r()>.5?1:-1);
+        obstaculos.push({linhaX:x,x:p.x,y:p.y,raio:22+r()*6,passou:false,tipo:tipo});
+      }else{
+        obstaculos.push({linhaX:x,x:x,y:linhaY(x),abertura:120,w:24,passou:false,tipo:tipo});
+      }
+    }
+  }
 }
 function tocar(e){
   e.preventDefault();
   if(estado !== 'play' || !player) return;
 
   if(modo === 'fora'){
-    player.alvoLado *= -1;
-    explosao(player.x, player.y, '#00e5ff', 5);
+    player.alvoLado = -player.alvoLado;
+    // Força mudança imediata
+    player.lado = player.alvoLado * 0.9;
+    explosao(player.x, player.y, '#00e5ff', 8);
   }else{
     // V9 CORRIGIDO: pulo mais suave, igual Circle
     player.driftVel = -340;
@@ -387,6 +461,7 @@ function update(dt){
     return;
   }
   if(estado !== 'play') return;
+  atualizarClima(dt);
 
   const telaX = Math.max(165, Math.min(235, W * .34));
   camera += fase.velocidade * dt;
@@ -541,6 +616,8 @@ function explosao(x,y,cor,qtd){
 
 function draw(){
   ctx.clearRect(0,0,W,H);
+  desenharClima();
+  desenharNomesPlanetas();
   fundo();
   linha();
   objetos();
