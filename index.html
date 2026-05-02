@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WV Argolas Neon V8</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050713;color:#fff;font-family:Arial,Helvetica,sans-serif}
+canvas{position:fixed;inset:0;width:100vw;height:100vh;touch-action:none}
+.hud{position:fixed;top:0;left:0;right:0;padding:12px;display:flex;justify-content:space-between;gap:8px;z-index:5;pointer-events:none}
+.box{background:rgba(10,14,32,.82);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:9px 12px;min-width:78px;box-shadow:0 8px 25px rgba(0,0,0,.3)}
+.box b{display:block;font-size:15px}
+.box span{font-size:10px;color:#9aa7cd;text-transform:uppercase;letter-spacing:.08em}
+.right{display:flex;gap:8px}
+.pause{pointer-events:auto;border:0;border-radius:16px;background:linear-gradient(135deg,#7c4dff,#26305d);color:#fff;font-weight:900;padding:10px 14px;font-size:16px}
+.overlay{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:rgba(2,3,10,.72);backdrop-filter:blur(10px);padding:18px}
+.hidden{display:none!important}
+.card{width:min(590px,100%);max-height:92vh;overflow:auto;background:linear-gradient(180deg,#151b36,#080b1c);border:1px solid rgba(255,255,255,.14);border-radius:28px;padding:22px;box-shadow:0 25px 70px rgba(0,0,0,.55)}
+.logo{width:84px;height:84px;margin:0 auto 12px;border-radius:28px;background:radial-gradient(circle,transparent 0 39%,#00e5ff 41% 57%,transparent 59%),linear-gradient(135deg,#00e5ff,#7c4dff);box-shadow:0 0 42px rgba(0,229,255,.3);position:relative}
+.logo:after{content:"WV";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;text-shadow:0 2px 8px #000}
+h1{margin:0 0 8px;text-align:center;font-size:28px}
+h2{margin:0 0 12px;text-align:center}
+p{color:#9aa7cd;text-align:center;line-height:1.45}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{border:0;border-radius:18px;padding:14px;color:#fff;font-weight:900;font-size:15px;background:linear-gradient(135deg,#00c6ff,#5845ff);box-shadow:0 10px 25px rgba(0,0,0,.32);cursor:pointer}
+.btn.secondary{background:linear-gradient(135deg,#252d4d,#151a30);border:1px solid rgba(255,255,255,.12)}
+.btn.ok{background:linear-gradient(135deg,#00c853,#00a3a3)}
+.full{grid-column:1/-1;width:100%}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:18px;padding:12px;margin:10px 0}
+.row small{display:block;color:#9aa7cd;margin-top:3px}
+.modebox{background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.20);border-radius:20px;padding:12px;margin:12px 0}
+.modeTitle{font-weight:900;text-align:center;margin-bottom:10px;color:#eef3ff}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modeBtn{border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:13px 10px;background:rgba(255,255,255,.055);color:#fff;text-align:center;font-weight:900;cursor:pointer}
+.modeBtn small{display:block;color:#9aa7cd;margin-top:5px;font-weight:700;line-height:1.25}
+.modeBtn.active{background:linear-gradient(135deg,#00c6ff,#5845ff);border-color:rgba(255,255,255,.36);box-shadow:0 0 22px rgba(0,229,255,.18)}
+.shop{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.skin{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:12px;text-align:center}
+.ringdemo{width:52px;height:52px;border-radius:50%;border:10px solid #00e5ff;margin:0 auto 8px;box-shadow:0 0 20px currentColor}
+.skin b{font-size:13px;display:block}
+.skin small{display:block;color:#9aa7cd;margin:5px 0 9px}
+.skin button{width:100%;border:0;border-radius:12px;padding:9px;font-weight:900;color:#fff;background:#293155}
+.skin button.buy{background:linear-gradient(135deg,#ffb300,#ff6d00)}
+.skin button.use{background:linear-gradient(135deg,#00c853,#00a3a3)}
+.rangebox{margin-top:12px;background:rgba(255,255,255,.05);border-radius:18px;padding:12px}
+.rangebox label{display:block;color:#9aa7cd;font-size:13px;margin-bottom:8px}
+input[type=range]{width:100%}
+.footer{font-size:12px;color:#707da2}
+@media(max-width:430px){h1{font-size:24px}.card{padding:18px}.box{padding:8px 9px;min-width:70px}.box b{font-size:13px}.box span{font-size:9px}.shop,.modes{grid-template-columns:1fr 1fr}.modeBtn{font-size:13px;padding:11px 8px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div class="hud">
+  <div class="box"><b id="fase">Fase 1</b><span>1200 fases</span></div>
+  <div class="right">
+    <div class="box"><b id="pontos">0</b><span>Pontos</span></div>
+    <div class="box"><b id="moedas">0</b><span>Moedas</span></div>
+    <button class="pause" id="pause">Ⅱ</button>
+  </div>
+</div>
+
+<div class="overlay" id="menu">
+  <div class="card">
+    <div class="logo"></div>
+    <h1>WV ARGOLAS NEON V8</h1>
+    <p>Escolha o modo de jogo. No modo Linha por Dentro, toque em qualquer lugar da tela para a argola pular. Quando bater, ela fica pendurada na linha.</p>
+
+    <div class="modebox">
+      <div class="modeTitle">MODO DE JOGO</div>
+      <div class="modes">
+        <button class="modeBtn active" id="modoDentro">LINHA POR DENTRO<small>Toque na tela para pular</small></button>
+        <button class="modeBtn" id="modoFora">ARGOLA POR FORA<small>Toque para trocar lado da linha</small></button>
+      </div>
+    </div>
+
+    <div class="row"><div><b>Progresso salvo</b><small id="info">Fase 1 • 0 moedas</small></div><button class="btn secondary" id="salvarBtn">Salvar</button></div>
+    <div class="grid" style="margin-bottom:10px">
+      <button class="btn secondary" id="zerarFases">ZERAR FASES</button>
+      <button class="btn secondary" id="zerar">ZERAR TUDO</button>
+    </div>
+    <div class="grid">
+      <button class="btn full" id="jogar">COMEÇAR</button>
+      <button class="btn secondary" id="lojaBtn">LOJA DE ARGOLAS</button>
+      <button class="btn secondary" id="faseBtn">ESCOLHER FASE</button>
+    </div>
+    <div class="rangebox hidden" id="faseBox">
+      <label>Escolher fase liberada: <b id="faseLabel">1</b></label>
+      <input type="range" id="faseRange" min="1" max="1" value="1">
+      <button class="btn ok full" id="irFase" style="margin-top:10px">ABRIR FASE</button>
+    </div>
+    <p class="footer">@wv.curiosidades • HTML único • V8 toque para pular no modo linha por dentro</p>
+  </div>
+</div>
+
+<div class="overlay hidden" id="loja">
+  <div class="card">
+    <h2>Loja de Argolas</h2>
+    <p>Compre novas argolas com as moedas coletadas.</p>
+    <div class="shop" id="skins"></div>
+    <button class="btn secondary full" id="voltarLoja" style="margin-top:12px">VOLTAR</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="msg">
+  <div class="card">
+    <h2 id="msgTitulo">Fim</h2>
+    <p id="msgTexto"></p>
+    <div class="grid">
+      <button class="btn" id="deNovo">TENTAR DE NOVO</button>
+      <button class="btn ok" id="proxima">PRÓXIMA</button>
+      <button class="btn secondary full" id="inicio">MENU</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const $ = id => document.getElementById(id);
+
+const TOTAL = 1200;
+const KEY = 'wv_argolas_neon_v8_pular';
+
+const skins = [
+  {id:'cyan',nome:'Neon Azul',cor:'#00e5ff',preco:0},
+  {id:'gold',nome:'Ouro',cor:'#ffd54a',preco:120},
+  {id:'pink',nome:'Rosa Shock',cor:'#ff3bd5',preco:220},
+  {id:'green',nome:'Verde Laser',cor:'#36f58b',preco:350},
+  {id:'red',nome:'Vermelha',cor:'#ff3b6b',preco:500},
+  {id:'purple',nome:'Roxa Pro',cor:'#a56bff',preco:700},
+  {id:'white',nome:'Cristal',cor:'#ffffff',preco:950},
+  {id:'rainbow',nome:'Arco WV',cor:'#00e5ff',preco:1300}
+];
+
+let W = innerWidth, H = innerHeight, DPR = 1;
+let save = carregar();
+let modo = save.modo || 'dentro'; // dentro | fora
+let estado = 'menu';
+let fase = criarFase(save.fase);
+let player = null;
+let camera = 0;
+let moedasRun = 0;
+let pontosRun = 0;
+let progressoMax = 0;
+let moedasObj = [];
+let obstaculos = [];
+let particulas = [];
+let estrelas = [];
+let countdown = 0;
+let ultimo = 0;
+let faseCompleta = false;
+
+function carregar(){
+  try{
+    const d = JSON.parse(localStorage.getItem(KEY) || '{}');
+    return {
+      fase: Math.max(1, Math.min(TOTAL, d.fase || 1)),
+      moedas: Math.max(0, d.moedas || 0),
+      skin: d.skin || 'cyan',
+      modo: d.modo || 'dentro',
+      compradas: Array.isArray(d.compradas) ? d.compradas : ['cyan']
+    };
+  }catch(e){
+    return {fase:1,moedas:0,skin:'cyan',modo:'dentro',compradas:['cyan']};
+  }
+}
+function salvar(){
+  save.modo = modo;
+  localStorage.setItem(KEY, JSON.stringify(save));
+  atualizarHud();
+}
+function randSeed(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  }
+}
+function criarFase(n){
+  const d = Math.min(1, n / 1000);
+  return {
+    n,
+    seed: n * 911 + 77,
+    tamanho: 2750 + n * 4,
+    amp: 36 + d * 48,
+    freq: .0053 + d * .0037,
+    velocidade: 126 + d * 62 + Math.min(40, n * .021),
+    raioDentro: 43 - d * 2,
+    furoDentro: 32 - d * 3,
+    raioFora: 50 - d * 3,
+    furoFora: 28 - d * 3,
+    offset: 43 - d * 5
+  };
+}
+function linhaY(x){
+  const base = H * .53;
+  return base
+    + Math.sin(x * fase.freq + fase.n * .36) * fase.amp
+    + Math.sin(x * fase.freq * .42 + fase.n) * fase.amp * .42;
+}
+function linhaSlope(x){
+  const y1 = linhaY(x - 8);
+  const y2 = linhaY(x + 8);
+  return Math.atan2(y2 - y1, 16);
+}
+function posNaLinha(x, lado){
+  const y = linhaY(x);
+  const a = linhaSlope(x);
+  const nx = -Math.sin(a);
+  const ny = Math.cos(a);
+  return {x: x + nx * fase.offset * lado, y: y + ny * fase.offset * lado, angle: a};
+}
+function resize(){
+  DPR = Math.max(1, Math.min(2, devicePixelRatio || 1));
+  W = innerWidth; H = innerHeight;
+  canvas.width = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  gerarEstrelas();
+}
+window.addEventListener('resize', resize);
+
+function gerarEstrelas(){
+  estrelas = [];
+  const r = randSeed(1234);
+  for(let i=0;i<90;i++) estrelas.push({x:r()*W,y:r()*H,s:r()*1.7+.4,a:r()*.7+.18});
+}
+function iniciar(n){
+  fase = criarFase(n);
+  camera = 0;
+  faseCompleta = false;
+  const baseX = 190;
+  const pos = modo === 'fora' ? posNaLinha(baseX, 1) : {x:baseX, y:linhaY(baseX), angle:linhaSlope(baseX)};
+  player = {
+    linhaX: baseX,
+    x: pos.x,
+    y: pos.y,
+    angle: pos.angle,
+    lado: 1,
+    alvoLado: 1,
+    raio: modo === 'fora' ? fase.raioFora : fase.raioDentro,
+    furo: modo === 'fora' ? fase.furoFora : fase.furoDentro,
+    inv: 1.1,
+    drift: 0,
+    driftVel: 0,
+    driftTarget: 0,
+    perdeuPendurada: false,
+    puloCooldown: 0 // Novo: cooldown entre pulos
+  };
+  moedasRun = 0;
+  pontosRun = 0;
+  progressoMax = 0;
+  particulas = [];
+  gerarObjetos();
+  countdown = 3.2;
+  estado = 'countdown';
+  esconderTudo();
+  atualizarHud();
+}
+function gerarObjetos(){
+  moedasObj = [];
+  obstaculos = [];
+  const r = randSeed(fase.seed + (modo === 'fora' ? 500 : 0));
+
+  for(let x=560;x<fase.tamanho-220;x+=215+r()*140){
+    if(modo === 'fora'){
+      const lado = r() > .5 ? 1 : -1;
+      const p = posNaLinha(x, lado);
+      moedasObj.push({x:p.x,y:p.y,linhaX:x,pegou:false,t:r()*10});
+    }else{
+      moedasObj.push({x:x,y:linhaY(x)+(r()-.5)*95,linhaX:x,pegou:false,t:r()*10});
+    }
+  }
+
+  const qtd = Math.floor(5 + fase.n / 20);
+  for(let i=0;i<qtd;i++){
+    const x = 1120 + i * ((fase.tamanho - 1500) / Math.max(1, qtd)) + r() * 140;
+    if(modo === 'fora'){
+      const ladoSeguro = r() > .5 ? 1 : -1;
+      const p1 = posNaLinha(x, -ladoSeguro);
+      obstaculos.push({linhaX:x,x:p1.x,y:p1.y,raio:28+r()*8,passou:false,tipo:'bola'});
+    }else{
+      const y = linhaY(x) + (r()-.5)*95;
+      obstaculos.push({linhaX:x,x:x,y:y,abertura:138 - Math.min(28, fase.n*.015),w:28,passou:false,tipo:'portao'});
+    }
+  }
+}
+function tocar(e){
+  e.preventDefault();
+  if(estado !== 'play' || !player) return;
+
+  if(modo === 'fora'){
+    player.alvoLado *= -1;
+    explosao(player.x, player.y, '#00e5ff', 5);
+  }else{
+    // Verificar cooldown entre pulos
+    if(player.puloCooldown > 0) return;
+    
+    // Aplicar pulo com força controlada
+    player.driftVel = -380; // Força do pulo reduzida
+    player.drift -= 1.5; // Deslocamento inicial mais suave
+    
+    // Limitar o pulo máximo para não ir muito longe
+    if(player.drift < -player.furo + 8) player.drift = -player.furo + 8;
+    
+    // Definir cooldown de 0.3 segundos entre pulos
+    player.puloCooldown = 0.3;
+    
+    explosao(player.x, player.y, '#00e5ff', 4);
+  }
+}
+canvas.addEventListener('pointerdown', tocar, {passive:false});
+canvas.addEventListener('touchstart', tocar, {passive:false});
+window.addEventListener('keydown', e=>{
+  if(e.code === 'Space' || e.code === 'ArrowUp') tocar(e);
+});
+
+function update(dt){
+  if(estado === 'countdown'){
+    countdown -= dt;
+    if(countdown <= 0) estado = 'play';
+    return;
+  }
+  if(estado !== 'play') return;
+
+  const telaX = Math.max(165, Math.min(235, W * .34));
+  camera += fase.velocidade * dt;
+
+  // Verificar se o jogador chegou na linha de chegada
+  if (!faseCompleta && camera >= fase.tamanho - W * .6) {
+    faseCompleta = true;
+    ganhar();
+    return;
+  }
+
+  player.linhaX = camera + telaX;
+  
+  // Atualizar cooldown do pulo
+  if (player.puloCooldown > 0) {
+    player.puloCooldown = Math.max(0, player.puloCooldown - dt);
+  }
+
+  if(modo === 'fora'){
+    const suavidade = 1 - Math.pow(.001, dt);
+    player.lado += (player.alvoLado - player.lado) * suavidade * 5.2;
+    if(Math.abs(player.lado - player.alvoLado) < .01) player.lado = player.alvoLado;
+    const p = posNaLinha(player.linhaX, player.lado);
+    player.x = p.x;
+    player.y = p.y;
+    player.angle = p.angle;
+  }else{
+    // Ajuste na gravidade e amortecimento para movimento mais controlado
+    player.driftVel += 480 * dt; // Gravidade um pouco mais suave
+    player.driftVel *= .988; // Amortecimento mais suave
+    player.drift += player.driftVel * dt;
+    
+    const limiteVisual = player.furo + 10; // Limite visual reduzido
+    if(player.drift > limiteVisual){ 
+      player.drift = limiteVisual; 
+      player.driftVel *= -.08; // Quique mais suave
+    }
+    if(player.drift < -limiteVisual){ 
+      player.drift = -limiteVisual; 
+      player.driftVel *= -.08; // Quique mais suave
+    }
+
+    const a = linhaSlope(player.linhaX);
+    const nx = -Math.sin(a);
+    const ny = Math.cos(a);
+    player.x = player.linhaX + nx * player.drift;
+    player.y = linhaY(player.linhaX) + ny * player.drift;
+    player.angle = a;
+  }
+
+  player.inv = Math.max(0, player.inv - dt);
+
+  if(modo === 'fora' && player.inv <= 0 && Math.abs(player.lado) < .22){
+    perder('A linha pegou na borda da argola durante a troca. Toque um pouco antes para trocar de lado.');
+    return;
+  }
+
+  if(modo === 'dentro'){
+    // Verificação mais tolerante para colisão com a linha
+    if(player.inv <= 0 && Math.abs(player.drift) > player.furo - 3){
+      player.drift = Math.sign(player.drift || 1) * (player.furo - 3);
+      player.driftVel = 0;
+      player.perdeuPendurada = true;
+      const a = linhaSlope(player.linhaX);
+      const nx = -Math.sin(a);
+      const ny = Math.cos(a);
+      player.x = player.linhaX + nx * player.drift;
+      player.y = linhaY(player.linhaX) + ny * player.drift;
+      player.angle = a;
+      perder('A argola ficou pendurada na linha. Toque na tela para pular antes de encostar na borda.');
+      return;
+    }
+  }
+
+  for(const o of obstaculos){
+    const sx = o.x - camera;
+    if(sx < -120 || sx > W + 120) continue;
+
+    if(o.tipo === 'bola'){
+      const dx = sx - telaX;
+      const dy = o.y - player.y;
+      const limite = player.raio + o.raio - 8;
+      if(player.inv <= 0 && dx*dx + dy*dy < limite*limite){
+        perder('Você bateu no obstáculo neon. Troque o lado da argola antes dele.');
+        return;
+      }
+    }else{
+      const dx = Math.abs(sx - telaX);
+      const dy = Math.abs(player.y - o.y);
+      if(player.inv <= 0 && dx < o.w && dy > o.abertura/2){
+        perder('Você bateu no portão neon. Mantenha a linha dentro da argola e passe pela abertura.');
+        return;
+      }
+    }
+
+    if(!o.passou && o.linhaX < player.linhaX){
+      o.passou = true;
+      explosao(telaX, player.y, '#36f58b', 7);
+    }
+  }
+
+  for(const m of moedasObj){
+    if(m.pegou) continue;
+    const sx = m.x - camera;
+    if(sx < -80 || sx > W + 80) continue;
+    const dx = sx - telaX;
+    const dy = m.y - player.y;
+    if(dx*dx + dy*dy < (player.raio + 18) * (player.raio + 18)){
+      m.pegou = true;
+      moedasRun++;
+      explosao(telaX, player.y, '#ffd54a', 8);
+    }
+  }
+
+  particulas = particulas.filter(p=>{
+    p.vida -= dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 120 * dt;
+    return p.vida > 0;
+  });
+
+  // Atualizar progresso para exibição na barra
+  const prog = Math.min(1, camera / (fase.tamanho - W * .6));
+  progressoMax = Math.max(progressoMax, prog);
+  pontosRun = Math.floor(prog * 1000) + moedasRun * 15 + fase.n * 2;
+
+  atualizarHud();
+}
+function perder(texto){
+  estado = 'end';
+  faseCompleta = false;
+  $('msgTitulo').textContent = 'Fase perdida';
+  $('msgTexto').textContent = texto + ' Progresso: ' + Math.floor(progressoMax*100) + '%. Moedas coletadas: ' + moedasRun + '.';
+  $('proxima').classList.add('hidden');
+  setTimeout(()=>mostrar('msg'),250);
+}
+function ganhar(){
+  estado = 'end';
+  const bonus = Math.max(5, Math.floor(fase.n/10));
+  const total = moedasRun + bonus;
+  save.moedas += total;
+  if(fase.n >= save.fase && save.fase < TOTAL) save.fase = fase.n + 1;
+  save.modo = modo;
+  salvar();
+  $('msgTitulo').textContent = 'Fase concluída!';
+  $('msgTexto').textContent = 'Você ganhou ' + total + ' moedas. Próxima fase liberada: ' + save.fase + '.';
+  $('proxima').classList.toggle('hidden', fase.n >= TOTAL);
+  mostrar('msg');
+}
+function explosao(x,y,cor,qtd){
+  for(let i=0;i<qtd;i++){
+    const a = Math.random()*Math.PI*2;
+    const s = 60+Math.random()*170;
+    particulas.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,vida:.35+Math.random()*.35,cor});
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  fundo();
+  linha();
+  objetos();
+  argola();
+  barra();
+  particulasDraw();
+  contagemDraw();
+}
+function fundo(){
+  const g = ctx.createRadialGradient(W*.5,H*.08,40,W*.5,H*.62,Math.max(W,H));
+  g.addColorStop(0,'#111b43'); g.addColorStop(.55,'#050713'); g.addColorStop(1,'#02030a');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  ctx.save();
+  for(const e of estrelas){
+    ctx.globalAlpha = e.a;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(e.x,(e.y+camera*.03)%H,e.s,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = .18;
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 1;
+  for(let y=H*.15;y<H;y+=52){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y+Math.sin(camera*.002+y)*8); ctx.stroke();
+  }
+  ctx.restore();
+}
+function linha(){
+  ctx.save();
+  ctx.lineCap='round';
+  ctx.lineJoin='round';
+  ctx.shadowColor='#00e5ff';
+  ctx.shadowBlur=18;
+  ctx.strokeStyle='#00e5ff';
+  ctx.lineWidth=5;
+  ctx.beginPath();
+  for(let sx=-40;sx<W+50;sx+=8){
+    const y = linhaY(camera+sx);
+    if(sx===-40) ctx.moveTo(sx,y); else ctx.lineTo(sx,y);
+  }
+  ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.strokeStyle='rgba(255,255,255,.75)';
+  ctx.lineWidth=1.4;
+  ctx.stroke();
+  ctx.restore();
+}
+function objetos(){
+  for(const m of moedasObj){
+    if(m.pegou) continue;
+    const sx = m.x - camera;
+    if(sx < -50 || sx > W + 50) continue;
+    m.t += .07;
+    const r = 10 + Math.sin(m.t) * 2;
+    ctx.save();
+    ctx.shadowColor='#ffd54a'; ctx.shadowBlur=18;
+    ctx.fillStyle='#ffd54a';
+    ctx.beginPath(); ctx.arc(sx,m.y,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#5d3b00'; ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('$',sx,m.y+.5);
+    ctx.restore();
+  }
+  for(const o of obstaculos){
+    const sx = o.x - camera;
+    if(sx < -100 || sx > W + 100) continue;
+    ctx.save();
+    ctx.shadowColor='#ff3b6b'; ctx.shadowBlur=18;
+    ctx.fillStyle='#ff3b6b';
+    if(o.tipo === 'bola'){
+      ctx.beginPath(); ctx.arc(sx,o.y,o.raio,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.22)';
+      ctx.beginPath(); ctx.arc(sx-8,o.y-8,o.raio*.32,0,Math.PI*2); ctx.fill();
+    }else{
+      round(sx-o.w/2,0,o.w,o.y-o.abertura/2,10);
+      round(sx-o.w/2,o.y+o.abertura/2,o.w,H-(o.y+o.abertura/2),10);
+    }
+    ctx.restore();
+  }
+  const fx = fase.tamanho - camera;
+  if(fx > -20 && fx < W + 60){
+    ctx.save();
+    ctx.shadowColor='#36f58b'; ctx.shadowBlur=22;
+    ctx.strokeStyle='#36f58b'; ctx.lineWidth=6; ctx.setLineDash([18,12]);
+    ctx.beginPath(); ctx.moveTo(fx,0); ctx.lineTo(fx,H); ctx.stroke();
+    ctx.restore();
+  }
+}
+function argola(){
+  if(!player) return;
+  const sx = player.x - camera;
+  const sk = skins.find(s=>s.id===save.skin) || skins[0];
+  ctx.save();
+  ctx.translate(sx, player.y);
+  ctx.rotate((player.angle || 0) + camera*.008);
+
+  const lw = Math.max(9, player.raio - player.furo);
+
+  if(sk.id === 'rainbow'){
+    const g = ctx.createConicGradient(0,0,0);
+    g.addColorStop(0,'#00e5ff'); g.addColorStop(.25,'#36f58b'); g.addColorStop(.5,'#ffd54a'); g.addColorStop(.75,'#ff3bd5'); g.addColorStop(1,'#00e5ff');
+    ctx.strokeStyle = g; ctx.shadowColor = '#00e5ff';
+  }else{
+    ctx.strokeStyle = sk.cor; ctx.shadowColor = sk.cor;
+  }
+
+  ctx.shadowBlur=26;
+  ctx.lineWidth=lw;
+  ctx.beginPath(); ctx.arc(0,0,(player.raio+player.furo)/2,0,Math.PI*2); ctx.stroke();
+
+  ctx.shadowBlur=0;
+  ctx.strokeStyle='rgba(255,255,255,.92)';
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(0,0,player.raio,0,Math.PI*2); ctx.stroke();
+
+  ctx.strokeStyle='rgba(0,0,0,.7)';
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(0,0,player.furo,0,Math.PI*2); ctx.stroke();
+
+  ctx.fillStyle='rgba(0,0,0,.10)';
+  ctx.beginPath(); ctx.arc(0,0,player.furo-2,0,Math.PI*2); ctx.fill();
+
+  if(player.perdeuPendurada){
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = '#ff3b6b';
+    ctx.strokeStyle = '#ff3b6b';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0,0,player.furo,0,Math.PI*2); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+function barra(){
+  if(!player) return;
+  const prog = Math.min(1,camera/(fase.tamanho-W*.6));
+  const w = Math.min(360,W-34);
+  const x = (W-w)/2, y = H-30;
+  ctx.fillStyle='rgba(255,255,255,.12)';
+  round(x,y,w,7,8);
+  const g = ctx.createLinearGradient(x,0,x+w,0);
+  g.addColorStop(0,'#00e5ff'); g.addColorStop(1,'#7c4dff');
+  ctx.fillStyle=g;
+  round(x,y,w*prog,7,8);
+}
+function particulasDraw(){
+  ctx.save();
+  for(const p of particulas){
+    ctx.globalAlpha = Math.max(0,p.vida*2.2);
+    ctx.fillStyle=p.cor;
+    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+function contagemDraw(){
+  if(estado !== 'countdown') return;
+  const n = Math.ceil(Math.max(0,countdown));
+  ctx.save();
+  ctx.fillStyle='rgba(0,0,0,.32)';
+  ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.shadowColor='#00e5ff'; ctx.shadowBlur=35;
+  ctx.fillStyle='#fff';
+  ctx.font='900 '+Math.min(118,W*.23)+'px Arial';
+  ctx.fillText(n>0 ? n : 'VAI!', W/2, H/2-18);
+  ctx.shadowBlur=0;
+  ctx.fillStyle='rgba(238,243,255,.9)';
+  ctx.font='800 17px Arial';
+  ctx.fillText(modo === 'fora' ? 'TOQUE PARA TROCAR O LADO DA ARGOLA' : 'TOQUE NA TELA PARA PULAR', W/2, H/2+72);
+  ctx.restore();
+}
+function round(x,y,w,h,r){
+  if(w<=0 || h<=0) return;
+  r = Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.fill();
+}
+function loop(t){
+  const dt = Math.min(.033,(t-ultimo)/1000 || 0);
+  ultimo = t;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+function atualizarModoUI(){
+  $('modoDentro').classList.toggle('active', modo === 'dentro');
+  $('modoFora').classList.toggle('active', modo === 'fora');
+}
+function atualizarHud(){
+  $('fase').textContent = 'Fase ' + fase.n;
+  $('pontos').textContent = pontosRun;
+  $('moedas').textContent = save.moedas;
+  $('info').textContent = 'Fase ' + save.fase + ' • ' + save.moedas + ' moedas • modo: ' + (modo === 'dentro' ? 'linha por dentro' : 'argola por fora');
+  $('faseRange').max = save.fase;
+  if(Number($('faseRange').value) > save.fase) $('faseRange').value = save.fase;
+  $('faseLabel').textContent = $('faseRange').value;
+  atualizarModoUI();
+}
+function esconderTudo(){
+  $('menu').classList.add('hidden');
+  $('loja').classList.add('hidden');
+  $('msg').classList.add('hidden');
+}
+function mostrar(id){
+  esconderTudo();
+  $(id).classList.remove('hidden');
+  if(id === 'loja') desenharLoja();
+  atualizarHud();
+}
+function desenharLoja(){
+  const box = $('skins');
+  box.innerHTML = '';
+  skins.forEach(s=>{
+    const comprada = save.compradas.includes(s.id);
+    const ativa = save.skin === s.id;
+    const el = document.createElement('div');
+    el.className='skin';
+    const style = s.id === 'rainbow'
+      ? 'background:conic-gradient(#00e5ff,#36f58b,#ffd54a,#ff3bd5,#00e5ff);border-color:#00e5ff'
+      : 'border-color:'+s.cor+';color:'+s.cor;
+    el.innerHTML = '<div class="ringdemo" style="'+style+'"></div><b>'+s.nome+'</b><small>'+(s.preco===0?'Grátis':s.preco+' moedas')+'</small>';
+    const b = document.createElement('button');
+    if(ativa){
+      b.textContent='USANDO'; b.disabled=true;
+    }else if(comprada){
+      b.textContent='USAR'; b.className='use';
+      b.onclick=()=>{save.skin=s.id;salvar();desenharLoja();};
+    }else{
+      b.textContent = save.moedas >= s.preco ? 'COMPRAR' : 'FALTA MOEDA';
+      b.className='buy'; b.disabled = save.moedas < s.preco;
+      b.onclick=()=>{save.moedas-=s.preco;save.compradas.push(s.id);save.skin=s.id;salvar();desenharLoja();};
+    }
+    el.appendChild(b);
+    box.appendChild(el);
+  });
+}
+
+$('modoDentro').onclick = ()=>{modo='dentro'; salvar(); atualizarModoUI();};
+$('modoFora').onclick = ()=>{modo='fora'; salvar(); atualizarModoUI();};
+$('jogar').onclick = ()=>iniciar(save.fase);
+$('lojaBtn').onclick = ()=>mostrar('loja');
+$('voltarLoja').onclick = ()=>mostrar('menu');
+$('deNovo').onclick = ()=>iniciar(fase.n);
+$('proxima').onclick = ()=>iniciar(Math.min(TOTAL,fase.n+1));
+$('inicio').onclick = ()=>{estado='menu';mostrar('menu');};
+$('faseBtn').onclick = ()=>$('faseBox').classList.toggle('hidden');
+$('faseRange').oninput = ()=>$('faseLabel').textContent = $('faseRange').value;
+$('irFase').onclick = ()=>iniciar(Number($('faseRange').value));
+$('pause').onclick = ()=>{
+  if(estado === 'play' || estado === 'countdown'){estado='paused';mostrar('menu');}
+  else if(estado === 'paused'){esconderTudo();estado='play';}
+};
+$('salvarBtn').onclick = ()=>{
+  save.modo = modo;
+  salvar();
+  alert('Progresso salvo com sucesso!');
+};
+$('zerarFases').onclick = ()=>{
+  if(confirm('Zerar somente as fases liberadas e voltar para a fase 1? Moedas e argolas serão mantidas.')){
+    save.fase = 1;
+    fase = criarFase(1);
+    pontosRun = 0;
+    salvar();
+    alert('Fases zeradas. Você voltou para a fase 1.');
+  }
+};
+$('zerar').onclick = ()=>{
+  if(confirm('Zerar progresso, moedas e argolas compradas?')){
+    localStorage.removeItem(KEY);
+    save = carregar();
+    modo = save.modo || 'dentro';
+    fase = criarFase(save.fase);
+    pontosRun = 0;
+    atualizarHud();
+  }
+};
+
+resize();
+fase = criarFase(save.fase);
+atualizarHud();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
