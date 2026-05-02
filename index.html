@@ -646,12 +646,20 @@ function desenharFundo(){
   if(fundo === 'sistema' && imgFundoSistema.complete){
     ctx.save();
     ctx.globalAlpha = 1;
-    // cobre tela toda mantendo proporção
+    // Fundo Sistema Solar com movimento horizontal suave acompanhando a câmera do jogo.
+    // Mantém a jogabilidade intacta; altera apenas a forma de desenhar o fundo.
     const img = imgFundoSistema;
-    const ratio = Math.max(W / img.width, H / img.height);
+    const ratio = Math.max(W / img.width, H / img.height, (W * 1.65) / img.width);
     const nw = img.width * ratio;
     const nh = img.height * ratio;
-    ctx.drawImage(img, (W - nw)/2, (H - nh)/2, nw, nh);
+    const y = (H - nh) / 2;
+    const velocidadeFundo = 0.16; // parallax leve: não atrapalha no celular
+    let x = -(camera * velocidadeFundo) % nw;
+    if(x > 0) x -= nw;
+    while(x < W){
+      ctx.drawImage(img, x, y, nw, nh);
+      x += nw;
+    }
     // leve escurecimento para contraste
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
     ctx.fillRect(0,0,W,H);
