@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>WV Argolas Neon V8</title>
+<title>WV Argolas Neon</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050713;color:#fff;font-family:Arial,Helvetica,sans-serif}
@@ -65,14 +65,24 @@ input[type=range]{width:100%}
 <div class="overlay" id="menu">
   <div class="card">
     <div class="logo"></div>
-    <h1>WV ARGOLAS NEON V8</h1>
-    <p>Escolha o modo de jogo. No modo Linha por Dentro, toque em qualquer lugar da tela para a argola pular. Quando bater, ela fica pendurada na linha.</p>
+    <h1>WV ARGOLAS NEON</h1>
+    <p>Escolha o modo de jogo. No modo Linha por Dentro, a argola fica NA LINHA. Toque para pular e manter a linha dentro do buraco, igual ao Circle.</p>
 
     <div class="modebox">
       <div class="modeTitle">MODO DE JOGO</div>
       <div class="modes">
         <button class="modeBtn active" id="modoDentro">LINHA POR DENTRO<small>Toque na tela para pular</small></button>
         <button class="modeBtn" id="modoFora">ARGOLA POR FORA<small>Toque para trocar lado da linha</small></button>
+      </div>
+    </div>
+
+    <div class="modebox">
+      <div class="modeTitle">DIFICULDADE</div>
+      <div class="modes" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <button class="modeBtn" id="dif1">FÁCIL<small>-25% tam.<br>-30% $</small></button>
+        <button class="modeBtn active" id="dif2">MÉDIO<small>Normal</small></button>
+        <button class="modeBtn" id="dif3">DIFÍCIL<small>+60% tam.<br>+60% $</small></button>
+        <button class="modeBtn" id="dif4">INSANO<small>+130% tam.<br>+130% $</small></button>
       </div>
     </div>
 
@@ -91,7 +101,7 @@ input[type=range]{width:100%}
       <input type="range" id="faseRange" min="1" max="1" value="1">
       <button class="btn ok full" id="irFase" style="margin-top:10px">ABRIR FASE</button>
     </div>
-    <p class="footer">@wv.curiosidades • HTML único • V8 toque para pular no modo linha por dentro</p>
+    <p class="footer">@wv.curiosidades • HTML único • Jogo Oficial</p>
   </div>
 </div>
 
@@ -113,6 +123,7 @@ input[type=range]{width:100%}
       <button class="btn ok" id="proxima">PRÓXIMA</button>
       <button class="btn secondary full" id="inicio">MENU</button>
     </div>
+    <p style="text-align:center;margin-top:14px;color:#00e5ff;font-weight:700;font-size:14px;text-shadow:0 0 12px rgba(0,229,255,.5)">segue lá @wv.curiosidades</p>
   </div>
 </div>
 
@@ -134,12 +145,19 @@ const skins = [
   {id:'red',nome:'Vermelha',cor:'#ff3b6b',preco:500},
   {id:'purple',nome:'Roxa Pro',cor:'#a56bff',preco:700},
   {id:'white',nome:'Cristal',cor:'#ffffff',preco:950},
-  {id:'rainbow',nome:'Arco WV',cor:'#00e5ff',preco:1300}
+  {id:'rainbow',nome:'Arco WV',cor:'#00e5ff',preco:1300},
+  {id:'diamond',nome:'Diamante',cor:'#b9f2ff',preco:1800,tipo:'premium'},
+  {id:'fire',nome:'Fogo Solar',cor:'#ff4500',preco:2200,tipo:'premium'},
+  {id:'ice',nome:'Gelo Ártico',cor:'#7dd3fc',preco:2200,tipo:'premium'},
+  {id:'galaxy',nome:'Galáxia',cor:'#8b5cf6',preco:2800,tipo:'premium'},
+  {id:'plasma',nome:'Plasma',cor:'#ec4899',preco:3200,tipo:'premium'},
+  {id:'void',nome:'Buraco Negro',cor:'#000000',preco:4000,tipo:'premium'}
 ];
 
 let W = innerWidth, H = innerHeight, DPR = 1;
 let save = carregar();
 let modo = save.modo || 'dentro'; // dentro | fora
+let dificuldade = save.dificuldade || 2; // 1=fácil, 2=médio, 3=difícil
 let estado = 'menu';
 let fase = criarFase(save.fase);
 let player = null;
@@ -153,7 +171,6 @@ let particulas = [];
 let estrelas = [];
 let countdown = 0;
 let ultimo = 0;
-let faseCompleta = false;
 
 function carregar(){
   try{
@@ -163,14 +180,16 @@ function carregar(){
       moedas: Math.max(0, d.moedas || 0),
       skin: d.skin || 'cyan',
       modo: d.modo || 'dentro',
+      dificuldade: d.dificuldade || 2,
       compradas: Array.isArray(d.compradas) ? d.compradas : ['cyan']
     };
   }catch(e){
-    return {fase:1,moedas:0,skin:'cyan',modo:'dentro',compradas:['cyan']};
+    return {fase:1,moedas:0,skin:'cyan',modo:'dentro',dificuldade:2,compradas:['cyan']};
   }
 }
 function salvar(){
   save.modo = modo;
+  save.dificuldade = dificuldade;
   localStorage.setItem(KEY, JSON.stringify(save));
   atualizarHud();
 }
@@ -184,25 +203,74 @@ function randSeed(a){
 }
 function criarFase(n){
   const d = Math.min(1, n / 1000);
+  const multTamanho = dificuldade === 1 ? 0.75 : dificuldade === 3 ? 1.6 : dificuldade === 4 ? 2.3 : 1.0;
+  const multVel = dificuldade === 1 ? 1.1 : dificuldade === 3 ? 0.9 : dificuldade === 4 ? 0.8 : 1.0;
+  // Formas que aumentam levemente desde o nível 1
+  const formas = ['onda','v','montanha','circulo','coracao','geometrico','ondulado'];
+  let forma;
+  if(n === 1) forma = 'onda';
+  else if(n === 2) forma = Math.random() < 0.7 ? 'onda' : 'v';
+  else if(n === 3) forma = formas[Math.floor(Math.random()*3)]; // onda, v, montanha
+  else if(n < 6) forma = formas[Math.floor(Math.random()*5)]; // até coração
+  else forma = formas[Math.floor(Math.random()*formas.length)]; // aleatório total
   return {
     n,
     seed: n * 911 + 77,
-    tamanho: 2750 + n * 4,
+    tamanho: (2750 + n * 4) * multTamanho,
     amp: 36 + d * 48,
     freq: .0053 + d * .0037,
-    velocidade: 126 + d * 62 + Math.min(40, n * .021),
-    raioDentro: 43 - d * 2,
-    furoDentro: 32 - d * 3,
-    raioFora: 50 - d * 3,
-    furoFora: 28 - d * 3,
-    offset: 43 - d * 5
+    velocidade: (126 + d * 62 + Math.min(40, n * .021)) * multVel,
+    // V9: buraco maior para ficar confortável na linha
+    raioDentro: 44 - d * 1.5,
+    furoDentro: 34 - d * 2,
+    raioFora: 44 - d * 1.5,  // MESMO TAMANHO do modo dentro
+    furoFora: 34 - d * 2,   // MESMO TAMANHO do modo dentro
+    offset: 43 - d * 5,
+    forma: forma
   };
 }
 function linhaY(x){
   const base = H * .53;
-  return base
-    + Math.sin(x * fase.freq + fase.n * .36) * fase.amp
-    + Math.sin(x * fase.freq * .42 + fase.n) * fase.amp * .42;
+  const f = fase.freq;
+  const a = fase.amp;
+  const forma = fase.forma || 'onda';
+  
+  if(forma === 'onda'){
+    return base + Math.sin(x * f + fase.n * .36) * a + Math.sin(x * f * .42 + fase.n) * a * .42;
+  }
+  if(forma === 'v'){
+    const periodo = 220;
+    const t = (x % periodo) / periodo;
+    const v = t < 0.5 ? (t*2) : (2 - t*2);
+    return base + (v - 0.5) * a * 1.6 + Math.sin(x * f * 2) * a * 0.18;
+  }
+  if(forma === 'montanha'){
+    const periodo = 280;
+    const t = (x % periodo) / periodo;
+    let m = t < 0.3 ? t/0.3 : t < 0.6 ? 1 - (t-0.3)/0.3 : 0;
+    return base + (m - 0.3) * a * 1.9 + Math.sin(x * f * 0.5) * a * 0.25;
+  }
+  if(forma === 'circulo'){
+    const periodo = 180;
+    const t = (x % periodo) / periodo * Math.PI * 2;
+    return base + Math.sin(t) * a * 1.1 + Math.cos(t*2) * a * 0.45;
+  }
+  if(forma === 'coracao'){
+    const periodo = 320;
+    const t = (x % periodo) / periodo * Math.PI * 2;
+    const heart = Math.sin(t) * Math.sqrt(Math.abs(Math.cos(t))) * 0.85;
+    return base + heart * a * 1.4 + Math.sin(x * f * 0.7) * a * 0.22;
+  }
+  if(forma === 'geometrico'){
+    const periodo = 200;
+    const t = (x % periodo) / periodo;
+    const sq = t < 0.25 ? 1 : t < 0.5 ? 0 : t < 0.75 ? -1 : 0;
+    return base + sq * a * 0.95 + Math.sin(x * f * 3) * a * 0.13;
+  }
+  if(forma === 'ondulado'){
+    return base + Math.sin(x * f * 1.3) * a * 0.75 + Math.sin(x * f * 2.7 + 1.2) * a * 0.55 + Math.sin(x * f * 0.4) * a * 0.8;
+  }
+  return base + Math.sin(x * f + fase.n * .36) * a;
 }
 function linhaSlope(x){
   const y1 = linhaY(x - 8);
@@ -236,7 +304,6 @@ function gerarEstrelas(){
 function iniciar(n){
   fase = criarFase(n);
   camera = 0;
-  faseCompleta = false;
   const baseX = 190;
   const pos = modo === 'fora' ? posNaLinha(baseX, 1) : {x:baseX, y:linhaY(baseX), angle:linhaSlope(baseX)};
   player = {
@@ -248,12 +315,11 @@ function iniciar(n){
     alvoLado: 1,
     raio: modo === 'fora' ? fase.raioFora : fase.raioDentro,
     furo: modo === 'fora' ? fase.furoFora : fase.furoDentro,
-    inv: 1.1,
+    inv: 1.4,
     drift: 0,
     driftVel: 0,
     driftTarget: 0,
-    perdeuPendurada: false,
-    puloCooldown: 0 // Novo: cooldown entre pulos
+    perdeuPendurada: false
   };
   moedasRun = 0;
   pontosRun = 0;
@@ -288,6 +354,7 @@ function gerarObjetos(){
       const p1 = posNaLinha(x, -ladoSeguro);
       obstaculos.push({linhaX:x,x:p1.x,y:p1.y,raio:28+r()*8,passou:false,tipo:'bola'});
     }else{
+      // No modo linha por dentro, o obstáculo é um portão com abertura.
       const y = linhaY(x) + (r()-.5)*95;
       obstaculos.push({linhaX:x,x:x,y:y,abertura:138 - Math.min(28, fase.n*.015),w:28,passou:false,tipo:'portao'});
     }
@@ -301,20 +368,10 @@ function tocar(e){
     player.alvoLado *= -1;
     explosao(player.x, player.y, '#00e5ff', 5);
   }else{
-    // Verificar cooldown entre pulos
-    if(player.puloCooldown > 0) return;
-    
-    // Aplicar pulo com força controlada
-    player.driftVel = -380; // Força do pulo reduzida
-    player.drift -= 1.5; // Deslocamento inicial mais suave
-    
-    // Limitar o pulo máximo para não ir muito longe
-    if(player.drift < -player.furo + 8) player.drift = -player.furo + 8;
-    
-    // Definir cooldown de 0.3 segundos entre pulos
-    player.puloCooldown = 0.3;
-    
-    explosao(player.x, player.y, '#00e5ff', 4);
+    // V9 CORRIGIDO: pulo mais suave, igual Circle
+    player.driftVel = -340;
+    // pequeno impulso, sem teleporte
+    explosao(player.x, player.y, '#00e5ff', 6);
   }
 }
 canvas.addEventListener('pointerdown', tocar, {passive:false});
@@ -333,20 +390,7 @@ function update(dt){
 
   const telaX = Math.max(165, Math.min(235, W * .34));
   camera += fase.velocidade * dt;
-
-  // Verificar se o jogador chegou na linha de chegada
-  if (!faseCompleta && camera >= fase.tamanho - W * .6) {
-    faseCompleta = true;
-    ganhar();
-    return;
-  }
-
   player.linhaX = camera + telaX;
-  
-  // Atualizar cooldown do pulo
-  if (player.puloCooldown > 0) {
-    player.puloCooldown = Math.max(0, player.puloCooldown - dt);
-  }
 
   if(modo === 'fora'){
     const suavidade = 1 - Math.pow(.001, dt);
@@ -357,19 +401,26 @@ function update(dt){
     player.y = p.y;
     player.angle = p.angle;
   }else{
-    // Ajuste na gravidade e amortecimento para movimento mais controlado
-    player.driftVel += 480 * dt; // Gravidade um pouco mais suave
-    player.driftVel *= .988; // Amortecimento mais suave
+    // V9 CORRIGIDO: física suave tipo Circle - argola fica na linha
+    // A linha passa por dentro do buraco. Gravidade puxa para baixo, pulo sobe.
+    const gravidade = 720;
+    const molaCentro = 18;  // força que traz de volta para o centro da linha
+    const amortecimento = 0.88;
+    
+    player.driftVel += gravidade * dt;
+    // mola para manter argola centrada na linha
+    player.driftVel -= player.drift * molaCentro * dt;
+    player.driftVel *= Math.pow(amortecimento, dt * 60);
     player.drift += player.driftVel * dt;
     
-    const limiteVisual = player.furo + 10; // Limite visual reduzido
+    const limiteVisual = player.furo + 6;
     if(player.drift > limiteVisual){ 
       player.drift = limiteVisual; 
-      player.driftVel *= -.08; // Quique mais suave
+      player.driftVel *= -0.25; 
     }
     if(player.drift < -limiteVisual){ 
       player.drift = -limiteVisual; 
-      player.driftVel *= -.08; // Quique mais suave
+      player.driftVel *= -0.25; 
     }
 
     const a = linhaSlope(player.linhaX);
@@ -388,9 +439,10 @@ function update(dt){
   }
 
   if(modo === 'dentro'){
-    // Verificação mais tolerante para colisão com a linha
-    if(player.inv <= 0 && Math.abs(player.drift) > player.furo - 3){
-      player.drift = Math.sign(player.drift || 1) * (player.furo - 3);
+    // V7: se bater na linha, não joga a argola para fora.
+    // Ela fica "pendurada" na borda da linha e o jogo mostra a perda.
+    if(player.inv <= 0 && Math.abs(player.drift) > player.furo - 1.5){
+      player.drift = Math.sign(player.drift || 1) * (player.furo - 1.5);
       player.driftVel = 0;
       player.perdeuPendurada = true;
       const a = linhaSlope(player.linhaX);
@@ -444,22 +496,21 @@ function update(dt){
     }
   }
 
+  const prog = Math.min(1, player.linhaX / fase.tamanho);
+  progressoMax = Math.max(progressoMax, prog);
+  pontosRun = Math.floor(prog * 1000) + moedasRun * 15 + fase.n * 2;
+
   particulas = particulas.filter(p=>{
     p.vida -= dt;
     p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 120 * dt;
     return p.vida > 0;
   });
 
-  // Atualizar progresso para exibição na barra
-  const prog = Math.min(1, camera / (fase.tamanho - W * .6));
-  progressoMax = Math.max(progressoMax, prog);
-  pontosRun = Math.floor(prog * 1000) + moedasRun * 15 + fase.n * 2;
-
+  if(prog >= 1) ganhar();
   atualizarHud();
 }
 function perder(texto){
   estado = 'end';
-  faseCompleta = false;
   $('msgTitulo').textContent = 'Fase perdida';
   $('msgTexto').textContent = texto + ' Progresso: ' + Math.floor(progressoMax*100) + '%. Moedas coletadas: ' + moedasRun + '.';
   $('proxima').classList.add('hidden');
@@ -468,13 +519,15 @@ function perder(texto){
 function ganhar(){
   estado = 'end';
   const bonus = Math.max(5, Math.floor(fase.n/10));
-  const total = moedasRun + bonus;
+  const multMoedas = dificuldade === 1 ? 0.7 : dificuldade === 3 ? 1.6 : dificuldade === 4 ? 2.3 : 1.0;
+  const total = Math.floor((moedasRun + bonus) * multMoedas);
   save.moedas += total;
   if(fase.n >= save.fase && save.fase < TOTAL) save.fase = fase.n + 1;
   save.modo = modo;
   salvar();
   $('msgTitulo').textContent = 'Fase concluída!';
-  $('msgTexto').textContent = 'Você ganhou ' + total + ' moedas. Próxima fase liberada: ' + save.fase + '.';
+  const difNome = dificuldade === 1 ? 'FÁCIL' : dificuldade === 3 ? 'DIFÍCIL' : dificuldade === 4 ? 'INSANO' : 'MÉDIO';
+  $('msgTexto').textContent = 'Você ganhou ' + total + ' moedas ('+difNome+'). Próxima fase liberada: ' + save.fase + '.';
   $('proxima').classList.toggle('hidden', fase.n >= TOTAL);
   mostrar('msg');
 }
@@ -497,22 +550,107 @@ function draw(){
   contagemDraw();
 }
 function fundo(){
-  const g = ctx.createRadialGradient(W*.5,H*.08,40,W*.5,H*.62,Math.max(W,H));
-  g.addColorStop(0,'#111b43'); g.addColorStop(.55,'#050713'); g.addColorStop(1,'#02030a');
-  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
-  ctx.save();
-  for(const e of estrelas){
-    ctx.globalAlpha = e.a;
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(e.x,(e.y+camera*.03)%H,e.s,0,Math.PI*2); ctx.fill();
+  // Sistema de temas - 10 cenários que mudam por fase
+  const temas = [
+    {nome:'Espaço Profundo', c1:'#050713', c2:'#02030a', c3:'#000000', estrela:'#ffffff'}, // 1
+    {nome:'Nebulosa Roxa', c1:'#1a0b2e', c2:'#0f051a', c3:'#000000', estrela:'#c084fc'}, // 2
+    {nome:'Sol Ardente', c1:'#4a0e00', c2:'#1a0500', c3:'#000000', estrela:'#fbbf24'}, // 3
+    {nome:'Lua Prateada', c1:'#1e293b', c2:'#0f172a', c3:'#000000', estrela:'#e2e8f0'}, // 4
+    {nome:'Terra Vista', c1:'#0c4a6e', c2:'#082f49', c3:'#000000', estrela:'#7dd3fc'}, // 5
+    {nome:'Marte Vermelho', c1:'#7f1d1d', c2:'#450a0a', c3:'#000000', estrela:'#fca5a5'}, // 6
+    {nome:'Saturno', c1:'#422006', c2:'#1c0a00', c3:'#000000', estrela:'#fde68a'}, // 7
+    {nome:'Galáxia Espiral', c1:'#312e81', c2:'#1e1b4b', c3:'#000000', estrela:'#a78bfa'}, // 8
+    {nome:'Aurora Boreal', c1:'#064e3b', c2:'#022c22', c3:'#000000', estrela:'#6ee7b7'}, // 9
+    {nome:'Buraco Negro', c1:'#000000', c2:'#000000', c3:'#000000', estrela:'#ffffff'} // 10
+  ];
+  
+  let idx;
+  if(fase.n <= 10){
+    idx = fase.n - 1;
+  } else {
+    // Depois da fase 10, aleatório baseado na seed da fase
+    const r = randSeed(fase.seed + 999);
+    idx = Math.floor(r() * temas.length);
   }
-  ctx.globalAlpha = .18;
-  ctx.strokeStyle = '#00e5ff';
+  const tema = temas[idx];
+  
+  const g = ctx.createRadialGradient(W*.5,H*.08,40,W*.5,H*.62,Math.max(W,H));
+  g.addColorStop(0, tema.c1); 
+  g.addColorStop(.55, tema.c2); 
+  g.addColorStop(1, tema.c3);
+  ctx.fillStyle = g; 
+  ctx.fillRect(0,0,W,H);
+  
+  // Desenhar elementos especiais por tema
+  ctx.save();
+  if(idx === 2){ // Sol
+    ctx.globalAlpha = 0.15;
+    const solX = W * 0.85, solY = H * 0.2;
+    const solGrad = ctx.createRadialGradient(solX, solY, 0, solX, solY, 120);
+    solGrad.addColorStop(0, '#fbbf24');
+    solGrad.addColorStop(0.5, '#f97316');
+    solGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = solGrad;
+    ctx.beginPath(); ctx.arc(solX, solY, 120, 0, Math.PI*2); ctx.fill();
+  } else if(idx === 3){ // Lua
+    ctx.globalAlpha = 0.2;
+    ctx.fillStyle = '#e2e8f0';
+    ctx.beginPath(); ctx.arc(W*0.15, H*0.18, 45, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 0.1;
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath(); ctx.arc(W*0.15-15, H*0.18-10, 40, 0, Math.PI*2); ctx.fill();
+  } else if(idx === 4){ // Terra
+    ctx.globalAlpha = 0.12;
+    const terraGrad = ctx.createRadialGradient(W*0.8, H*0.25, 0, W*0.8, H*0.25, 80);
+    terraGrad.addColorStop(0, '#0ea5e9');
+    terraGrad.addColorStop(0.6, '#0369a1');
+    terraGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = terraGrad;
+    ctx.beginPath(); ctx.arc(W*0.8, H*0.25, 80, 0, Math.PI*2); ctx.fill();
+  } else if(idx === 5){ // Marte
+    ctx.globalAlpha = 0.14;
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath(); ctx.arc(W*0.2, H*0.3, 55, 0, Math.PI*2); ctx.fill();
+  } else if(idx === 6){ // Saturno
+    ctx.globalAlpha = 0.13;
+    ctx.fillStyle = '#fde68a';
+    ctx.beginPath(); ctx.arc(W*0.75, H*0.22, 40, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(253,230,138,0.4)';
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.ellipse(W*0.75, H*0.22, 70, 18, -0.3, 0, Math.PI*2); ctx.stroke();
+  }
+  
+  // Estrelas
+  for(const e of estrelas){
+    ctx.globalAlpha = e.a * 0.8;
+    ctx.fillStyle = tema.estrela;
+    ctx.beginPath(); 
+    ctx.arc(e.x, (e.y + camera * 0.03) % H, e.s, 0, Math.PI*2); 
+    ctx.fill();
+  }
+  
+  // Grid neon sutil
+  ctx.globalAlpha = .12;
+  ctx.strokeStyle = tema.estrela;
   ctx.lineWidth = 1;
-  for(let y=H*.15;y<H;y+=52){
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y+Math.sin(camera*.002+y)*8); ctx.stroke();
+  for(let y = H*.15; y < H; y += 52){
+    ctx.beginPath(); 
+    ctx.moveTo(0, y); 
+    ctx.lineTo(W, y + Math.sin(camera*.002 + y) * 8); 
+    ctx.stroke();
   }
   ctx.restore();
+  
+  // Nome do tema (sutil no canto)
+  if(fase.n <= 10){
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'right';
+    ctx.fillText(tema.nome, W-12, 24);
+    ctx.restore();
+  }
 }
 function linha(){
   ctx.save();
@@ -584,9 +722,48 @@ function argola(){
   const lw = Math.max(9, player.raio - player.furo);
 
   if(sk.id === 'rainbow'){
-    const g = ctx.createConicGradient(0,0,0);
+    const g = ctx.createConicGradient(Date.now()*0.001,0,0);
     g.addColorStop(0,'#00e5ff'); g.addColorStop(.25,'#36f58b'); g.addColorStop(.5,'#ffd54a'); g.addColorStop(.75,'#ff3bd5'); g.addColorStop(1,'#00e5ff');
-    ctx.strokeStyle = g; ctx.shadowColor = '#00e5ff';
+    ctx.strokeStyle = g; ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 32;
+  }else if(sk.id === 'diamond'){
+    const g = ctx.createLinearGradient(-30,-30,30,30);
+    g.addColorStop(0,'#e0f7ff'); g.addColorStop(0.5,'#b9f2ff'); g.addColorStop(1,'#ffffff');
+    ctx.strokeStyle = g; ctx.shadowColor = '#b9f2ff'; ctx.shadowBlur = 40;
+    // Brilhos extras
+    ctx.save(); ctx.globalAlpha = 0.6;
+    for(let i=0;i<4;i++){
+      const a = i*Math.PI/2 + Date.now()*0.002;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(Math.cos(a)*28, Math.sin(a)*28, 2, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }else if(sk.id === 'fire'){
+    const t = Date.now()*0.003;
+    const g = ctx.createRadialGradient(0,0,10,0,0,35);
+    g.addColorStop(0,'#ffeb3b'); g.addColorStop(0.4,'#ff6d00'); g.addColorStop(1,'#d50000');
+    ctx.strokeStyle = g; ctx.shadowColor = '#ff4500'; ctx.shadowBlur = 35;
+  }else if(sk.id === 'ice'){
+    ctx.strokeStyle = sk.cor; ctx.shadowColor = '#7dd3fc'; ctx.shadowBlur = 30;
+    ctx.save(); ctx.globalAlpha = 0.3; ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0,0,player.raio+8,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }else if(sk.id === 'galaxy'){
+    const g = ctx.createConicGradient(Date.now()*0.0005,0,0);
+    g.addColorStop(0,'#8b5cf6'); g.addColorStop(0.33,'#ec4899'); g.addColorStop(0.66,'#3b82f6'); g.addColorStop(1,'#8b5cf6');
+    ctx.strokeStyle = g; ctx.shadowColor = '#8b5cf6'; ctx.shadowBlur = 38;
+  }else if(sk.id === 'plasma'){
+    ctx.strokeStyle = sk.cor; ctx.shadowColor = sk.cor; ctx.shadowBlur = 45;
+    ctx.save(); ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.arc(0,0,player.raio+12,0,Math.PI*2); ctx.stroke();
+    ctx.restore();
+  }else if(sk.id === 'void'){
+    ctx.strokeStyle = '#1a1a1a'; ctx.shadowColor = '#000'; ctx.shadowBlur = 50;
+    ctx.save(); ctx.globalAlpha = 0.8;
+    const g = ctx.createRadialGradient(0,0,player.furo,0,0,player.raio);
+    g.addColorStop(0,'transparent'); g.addColorStop(1,'#000');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0,0,player.raio,0,Math.PI*2); ctx.fill();
+    ctx.restore();
   }else{
     ctx.strokeStyle = sk.cor; ctx.shadowColor = sk.cor;
   }
@@ -619,7 +796,7 @@ function argola(){
 }
 function barra(){
   if(!player) return;
-  const prog = Math.min(1,camera/(fase.tamanho-W*.6));
+  const prog = Math.min(1, Math.max(0, progressoMax));
   const w = Math.min(360,W-34);
   const x = (W-w)/2, y = H-30;
   ctx.fillStyle='rgba(255,255,255,.12)';
@@ -628,6 +805,17 @@ function barra(){
   g.addColorStop(0,'#00e5ff'); g.addColorStop(1,'#7c4dff');
   ctx.fillStyle=g;
   round(x,y,w*prog,7,8);
+  
+  // Instagram na barra de progresso
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = '#00e5ff';
+  ctx.font = 'bold 11px Arial';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#00e5ff';
+  ctx.shadowBlur = 8;
+  ctx.fillText('@wellingtonviana.pego', W/2, y - 10);
+  ctx.restore();
 }
 function particulasDraw(){
   ctx.save();
@@ -676,12 +864,17 @@ function loop(t){
 function atualizarModoUI(){
   $('modoDentro').classList.toggle('active', modo === 'dentro');
   $('modoFora').classList.toggle('active', modo === 'fora');
+  $('dif1').classList.toggle('active', dificuldade === 1);
+  $('dif2').classList.toggle('active', dificuldade === 2);
+  $('dif3').classList.toggle('active', dificuldade === 3);
+  $('dif4').classList.toggle('active', dificuldade === 4);
 }
 function atualizarHud(){
   $('fase').textContent = 'Fase ' + fase.n;
   $('pontos').textContent = pontosRun;
   $('moedas').textContent = save.moedas;
-  $('info').textContent = 'Fase ' + save.fase + ' • ' + save.moedas + ' moedas • modo: ' + (modo === 'dentro' ? 'linha por dentro' : 'argola por fora');
+  const difTxt = dificuldade === 1 ? 'FÁCIL' : dificuldade === 3 ? 'DIFÍCIL' : dificuldade === 4 ? 'INSANO' : 'MÉDIO';
+  $('info').textContent = 'Fase ' + save.fase + ' • ' + save.moedas + ' moedas • ' + difTxt;
   $('faseRange').max = save.fase;
   if(Number($('faseRange').value) > save.fase) $('faseRange').value = save.fase;
   $('faseLabel').textContent = $('faseRange').value;
@@ -706,10 +899,24 @@ function desenharLoja(){
     const ativa = save.skin === s.id;
     const el = document.createElement('div');
     el.className='skin';
-    const style = s.id === 'rainbow'
-      ? 'background:conic-gradient(#00e5ff,#36f58b,#ffd54a,#ff3bd5,#00e5ff);border-color:#00e5ff'
-      : 'border-color:'+s.cor+';color:'+s.cor;
-    el.innerHTML = '<div class="ringdemo" style="'+style+'"></div><b>'+s.nome+'</b><small>'+(s.preco===0?'Grátis':s.preco+' moedas')+'</small>';
+    let style = 'border-color:'+s.cor+';color:'+s.cor;
+    if(s.id === 'rainbow'){
+      style = 'background:conic-gradient(#00e5ff,#36f58b,#ffd54a,#ff3bd5,#00e5ff);border-color:#00e5ff';
+    } else if(s.id === 'diamond'){
+      style = 'background:linear-gradient(135deg,#e0f7ff,#b9f2ff,#fff);border-color:#b9f2ff;box-shadow:0 0 20px #b9f2ff';
+    } else if(s.id === 'fire'){
+      style = 'background:linear-gradient(135deg,#ff6d00,#d50000);border-color:#ff4500;box-shadow:0 0 20px #ff4500';
+    } else if(s.id === 'ice'){
+      style = 'background:linear-gradient(135deg,#7dd3fc,#e0f7ff);border-color:#7dd3fc';
+    } else if(s.id === 'galaxy'){
+      style = 'background:conic-gradient(#8b5cf6,#ec4899,#3b82f6,#8b5cf6);border-color:#8b5cf6';
+    } else if(s.id === 'plasma'){
+      style = 'background:radial-gradient(circle,#ec4899,#8b5cf6);border-color:#ec4899;box-shadow:0 0 25px #ec4899';
+    } else if(s.id === 'void'){
+      style = 'background:radial-gradient(circle,#000,#1a1a1a);border-color:#333;box-shadow:0 0 20px #000 inset';
+    }
+    const premiumTag = s.tipo === 'premium' ? ' <span style="color:#ffd700;font-size:10px">★</span>' : '';
+    el.innerHTML = '<div class="ringdemo" style="'+style+'"></div><b>'+s.nome+premiumTag+'</b><small>'+(s.preco===0?'Grátis':s.preco+' moedas')+'</small>';
     const b = document.createElement('button');
     if(ativa){
       b.textContent='USANDO'; b.disabled=true;
@@ -728,6 +935,10 @@ function desenharLoja(){
 
 $('modoDentro').onclick = ()=>{modo='dentro'; salvar(); atualizarModoUI();};
 $('modoFora').onclick = ()=>{modo='fora'; salvar(); atualizarModoUI();};
+$('dif1').onclick = ()=>{dificuldade=1; salvar(); atualizarModoUI();};
+$('dif2').onclick = ()=>{dificuldade=2; salvar(); atualizarModoUI();};
+$('dif3').onclick = ()=>{dificuldade=3; salvar(); atualizarModoUI();};
+$('dif4').onclick = ()=>{dificuldade=4; salvar(); atualizarModoUI();};
 $('jogar').onclick = ()=>iniciar(save.fase);
 $('lojaBtn').onclick = ()=>mostrar('loja');
 $('voltarLoja').onclick = ()=>mostrar('menu');
