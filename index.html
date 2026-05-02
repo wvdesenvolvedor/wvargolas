@@ -66,15 +66,7 @@ input[type=range]{width:100%}
   <div class="card">
     <div class="logo"></div>
     <h1>WV ARGOLAS NEON</h1>
-    <p>Escolha o modo de jogo. No modo Linha por Dentro, a argola fica NA LINHA. Toque para pular e manter a linha dentro do buraco, igual ao Circle.</p>
-
-    <div class="modebox">
-      <div class="modeTitle">MODO DE JOGO</div>
-      <div class="modes">
-        <button class="modeBtn active" id="modoDentro">LINHA POR DENTRO<small>Toque na tela para pular</small></button>
-        <button class="modeBtn" id="modoFora">ARGOLA POR FORA<small>Toque para trocar lado da linha</small></button>
-      </div>
-    </div>
+    <p>Toque na tela para pular e manter a linha dentro do buraco da argola, igual ao Circle.</p>
 
     <div class="modebox">
       <div class="modeTitle">DIFICULDADE</div>
@@ -168,7 +160,6 @@ const skins = [
 
 let W = innerWidth, H = innerHeight, DPR = 1;
 let save = carregar();
-let modo = save.modo || 'dentro'; // dentro | fora
 let dificuldade = save.dificuldade || 2; // 1=fácil, 2=médio, 3=difícil
 let fundo = save.fundo || 'temas'; // temas | sistema
 let estado = 'menu';
@@ -194,17 +185,15 @@ function carregar(){
       fase: Math.max(1, Math.min(TOTAL, d.fase || 1)),
       moedas: Math.max(0, d.moedas || 0),
       skin: d.skin || 'cyan',
-      modo: d.modo || 'dentro',
       dificuldade: d.dificuldade || 2,
       fundo: d.fundo || 'temas',
       compradas: Array.isArray(d.compradas) ? d.compradas : ['cyan']
     };
   }catch(e){
-    return {fase:1,moedas:0,skin:'cyan',modo:'dentro',dificuldade:2,fundo:'temas',compradas:['cyan']};
+    return {fase:1,moedas:0,skin:'cyan',dificuldade:2,fundo:'temas',compradas:['cyan']};
   }
 }
 function salvar(){
-  save.modo = modo;
   save.dificuldade = dificuldade;
   save.fundo = fundo;
   localStorage.setItem(KEY, JSON.stringify(save));
@@ -232,8 +221,6 @@ function criarFase(n){
     // V9: buraco maior para ficar confortável na linha
     raioDentro: 44 - d * 1.5,
     furoDentro: 34 - d * 2,
-    raioFora: 44 - d * 1.5,  // MESMO TAMANHO do modo dentro
-    furoFora: 34 - d * 2,   // MESMO TAMANHO do modo dentro
     offset: 43 - d * 5,
     forma: (function(){const formas=['onda','v','montanha','circulo','coracao','geometrico','ondulado']; if(n===1)return'onda'; if(n===2)return Math.random()<0.7?'onda':'v'; if(n<5)return formas[Math.floor(Math.random()*3)]; return formas[Math.floor(Math.random()*formas.length)];})()
   };
@@ -378,7 +365,7 @@ function iniciar(n){
   climaParticulas = [];
   camera = 0;
   const baseX = 190;
-  const pos = modo === 'fora' ? posNaLinha(baseX, 1) : {x:baseX, y:linhaY(baseX), angle:linhaSlope(baseX)};
+  const pos = {x:baseX, y:linhaY(baseX), angle:linhaSlope(baseX)};
   player = {
     linhaX: baseX,
     x: pos.x,
@@ -386,8 +373,8 @@ function iniciar(n){
     angle: pos.angle,
     lado: 1,
     alvoLado: 1,
-    raio: modo === 'fora' ? fase.raioFora : fase.raioDentro,
-    furo: modo === 'fora' ? fase.furoFora : fase.furoDentro,
+    raio: fase.raioDentro,
+    furo: fase.furoDentro,
     inv: 1.4,
     drift: 0,
     driftVel: 0,
@@ -407,30 +394,17 @@ function iniciar(n){
 function gerarObjetos(){
   moedasObj = [];
   obstaculos = [];
-  const r = randSeed(fase.seed + (modo === 'fora' ? 500 : 0));
+  const r = randSeed(fase.seed);
 
   for(let x=560;x<fase.tamanho-220;x+=215+r()*140){
-    if(modo === 'fora'){
-      const lado = r() > .5 ? 1 : -1;
-      const p = posNaLinha(x, lado);
-      moedasObj.push({x:p.x,y:p.y,linhaX:x,pegou:false,t:r()*10});
-    }else{
-      moedasObj.push({x:x,y:linhaY(x)+(r()-.5)*95,linhaX:x,pegou:false,t:r()*10});
-    }
+    moedasObj.push({x:x,y:linhaY(x)+(r()-.5)*95,linhaX:x,pegou:false,t:r()*10});
   }
 
   const qtd = Math.floor(5 + fase.n / 20);
   for(let i=0;i<qtd;i++){
     const x = 1120 + i * ((fase.tamanho - 1500) / Math.max(1, qtd)) + r() * 140;
-    if(modo === 'fora'){
-      const ladoSeguro = r() > .5 ? 1 : -1;
-      const p1 = posNaLinha(x, -ladoSeguro);
-      obstaculos.push({linhaX:x,x:p1.x,y:p1.y,raio:28+r()*8,passou:false,tipo:'bola'});
-    }else{
-      // No modo linha por dentro, o obstáculo é um portão com abertura.
-      const y = linhaY(x) + (r()-.5)*95;
-      obstaculos.push({linhaX:x,x:x,y:y,abertura:138 - Math.min(28, fase.n*.015),w:28,passou:false,tipo:'portao'});
-    }
+    const y = linhaY(x) + (r()-.5)*95;
+    obstaculos.push({linhaX:x,x:x,y:y,abertura:138 - Math.min(28, fase.n*.015),w:28,passou:false,tipo:'portao'});
   }
   // Fases difíceis: adiciona obstáculo extra no caminho
   if(fase.n >= 8){
@@ -438,31 +412,19 @@ function gerarObjetos(){
     for(let i=0;i<Math.min(3, Math.floor(fase.n/5)); i++){
       const x = 800 + i*600 + r()*200;
       const tipo = tipos[i % tipos.length];
-      if(modo === 'fora'){
-        const p = posNaLinha(x, r()>.5?1:-1);
-        obstaculos.push({linhaX:x,x:p.x,y:p.y,raio:22+r()*6,passou:false,tipo:tipo});
-      }else{
-        obstaculos.push({linhaX:x,x:x,y:linhaY(x),abertura:120,w:24,passou:false,tipo:tipo});
-      }
+      obstaculos.push({linhaX:x,x:x,y:linhaY(x),abertura:120,w:24,passou:false,tipo:tipo});
     }
   }
 }
+
 function tocar(e){
   e.preventDefault();
   if(estado !== 'play' || !player) return;
-
-  if(modo === 'fora'){
-    player.alvoLado = -player.alvoLado;
-    // Força mudança imediata
-    player.lado = player.alvoLado * 0.9;
-    explosao(player.x, player.y, '#00e5ff', 8);
-  }else{
-    // V9 CORRIGIDO: pulo mais suave, igual Circle
-    player.driftVel = -340;
-    // pequeno impulso, sem teleporte
-    explosao(player.x, player.y, '#00e5ff', 6);
-  }
+  // Pulo suave, igual Circle.
+  player.driftVel = -340;
+  explosao(player.x, player.y, '#00e5ff', 6);
 }
+
 canvas.addEventListener('pointerdown', tocar, {passive:false});
 canvas.addEventListener('touchstart', tocar, {passive:false});
 window.addEventListener('keydown', e=>{
@@ -482,68 +444,47 @@ function update(dt){
   camera += fase.velocidade * dt;
   player.linhaX = camera + telaX;
 
-  if(modo === 'fora'){
-    const suavidade = 1 - Math.pow(.001, dt);
-    player.lado += (player.alvoLado - player.lado) * suavidade * 5.2;
-    if(Math.abs(player.lado - player.alvoLado) < .01) player.lado = player.alvoLado;
-    const p = posNaLinha(player.linhaX, player.lado);
-    player.x = p.x;
-    player.y = p.y;
-    player.angle = p.angle;
-  }else{
-    // V9 CORRIGIDO: física suave tipo Circle - argola fica na linha
-    // A linha passa por dentro do buraco. Gravidade puxa para baixo, pulo sobe.
-    const gravidade = 720;
-    const molaCentro = 18;  // força que traz de volta para o centro da linha
-    const amortecimento = 0.88;
-    
-    player.driftVel += gravidade * dt;
-    // mola para manter argola centrada na linha
-    player.driftVel -= player.drift * molaCentro * dt;
-    player.driftVel *= Math.pow(amortecimento, dt * 60);
-    player.drift += player.driftVel * dt;
-    
-    const limiteVisual = player.furo + 6;
-    if(player.drift > limiteVisual){ 
-      player.drift = limiteVisual; 
-      player.driftVel *= -0.25; 
-    }
-    if(player.drift < -limiteVisual){ 
-      player.drift = -limiteVisual; 
-      player.driftVel *= -0.25; 
-    }
+  // Física suave tipo Circle: a linha passa por dentro do buraco da argola.
+  const gravidade = 720;
+  const molaCentro = 18;
+  const amortecimento = 0.88;
+  
+  player.driftVel += gravidade * dt;
+  player.driftVel -= player.drift * molaCentro * dt;
+  player.driftVel *= Math.pow(amortecimento, dt * 60);
+  player.drift += player.driftVel * dt;
+  
+  const limiteVisual = player.furo + 6;
+  if(player.drift > limiteVisual){ 
+    player.drift = limiteVisual; 
+    player.driftVel *= -0.25; 
+  }
+  if(player.drift < -limiteVisual){ 
+    player.drift = -limiteVisual; 
+    player.driftVel *= -0.25; 
+  }
 
+  const a = linhaSlope(player.linhaX);
+  const nx = -Math.sin(a);
+  const ny = Math.cos(a);
+  player.x = player.linhaX + nx * player.drift;
+  player.y = linhaY(player.linhaX) + ny * player.drift;
+  player.angle = a;
+
+  player.inv = Math.max(0, player.inv - dt);
+
+  if(player.inv <= 0 && Math.abs(player.drift) > player.furo - 1.5){
+    player.drift = Math.sign(player.drift || 1) * (player.furo - 1.5);
+    player.driftVel = 0;
+    player.perdeuPendurada = true;
     const a = linhaSlope(player.linhaX);
     const nx = -Math.sin(a);
     const ny = Math.cos(a);
     player.x = player.linhaX + nx * player.drift;
     player.y = linhaY(player.linhaX) + ny * player.drift;
     player.angle = a;
-  }
-
-  player.inv = Math.max(0, player.inv - dt);
-
-  if(modo === 'fora' && player.inv <= 0 && Math.abs(player.lado) < .22){
-    perder('A linha pegou na borda da argola durante a troca. Toque um pouco antes para trocar de lado.');
+    perder('A argola ficou pendurada na linha. Toque na tela para pular antes de encostar na borda.');
     return;
-  }
-
-  if(modo === 'dentro'){
-    // V7: se bater na linha, não joga a argola para fora.
-    // Ela fica "pendurada" na borda da linha e o jogo mostra a perda.
-    if(player.inv <= 0 && Math.abs(player.drift) > player.furo - 1.5){
-      player.drift = Math.sign(player.drift || 1) * (player.furo - 1.5);
-      player.driftVel = 0;
-      player.perdeuPendurada = true;
-      const a = linhaSlope(player.linhaX);
-      const nx = -Math.sin(a);
-      const ny = Math.cos(a);
-      player.x = player.linhaX + nx * player.drift;
-      player.y = linhaY(player.linhaX) + ny * player.drift;
-      player.angle = a;
-      perder('A argola ficou pendurada na linha. Toque na tela para pular antes de encostar na borda.');
-      return;
-    }
   }
 
   for(const o of obstaculos){
@@ -613,7 +554,6 @@ function ganhar(){
   const total = Math.floor((moedasRun + bonus) * multMoedas);
   save.moedas += total;
   if(fase.n >= save.fase && save.fase < TOTAL) save.fase = fase.n + 1;
-  save.modo = modo;
   salvar();
   $('msgTitulo').textContent = 'Fase concluída!';
   const difNome = dificuldade === 1 ? 'FÁCIL' : dificuldade === 3 ? 'DIFÍCIL' : dificuldade === 4 ? 'INSANO' : 'MÉDIO';
@@ -956,7 +896,7 @@ function contagemDraw(){
   ctx.shadowBlur=0;
   ctx.fillStyle='rgba(238,243,255,.9)';
   ctx.font='800 17px Arial';
-  ctx.fillText(modo === 'fora' ? 'TOQUE PARA TROCAR O LADO DA ARGOLA' : 'TOQUE NA TELA PARA PULAR', W/2, H/2+72);
+  ctx.fillText('TOQUE NA TELA PARA PULAR', W/2, H/2+72);
   ctx.restore();
 }
 function round(x,y,w,h,r){
@@ -978,8 +918,6 @@ function loop(t){
   requestAnimationFrame(loop);
 }
 function atualizarModoUI(){
-  $('modoDentro').classList.toggle('active', modo === 'dentro');
-  $('modoFora').classList.toggle('active', modo === 'fora');
   $('dif1').classList.toggle('active', dificuldade === 1);
   $('dif2').classList.toggle('active', dificuldade === 2);
   $('dif3').classList.toggle('active', dificuldade === 3);
@@ -1051,8 +989,6 @@ function desenharLoja(){
   });
 }
 
-$('modoDentro').onclick = ()=>{modo='dentro'; salvar(); atualizarModoUI();};
-$('modoFora').onclick = ()=>{modo='fora'; salvar(); atualizarModoUI();};
 $('dif1').onclick = ()=>{dificuldade=1; salvar(); atualizarModoUI();};
 $('dif2').onclick = ()=>{dificuldade=2; salvar(); atualizarModoUI();};
 $('dif3').onclick = ()=>{dificuldade=3; salvar(); atualizarModoUI();};
@@ -1073,7 +1009,6 @@ $('pause').onclick = ()=>{
   else if(estado === 'paused'){esconderTudo();estado='play';}
 };
 $('salvarBtn').onclick = ()=>{
-  save.modo = modo;
   salvar();
   alert('Progresso salvo com sucesso!');
 };
@@ -1090,7 +1025,6 @@ $('zerar').onclick = ()=>{
   if(confirm('Zerar progresso, moedas e argolas compradas?')){
     localStorage.removeItem(KEY);
     save = carregar();
-    modo = save.modo || 'dentro';
     fase = criarFase(save.fase);
     pontosRun = 0;
     atualizarHud();
